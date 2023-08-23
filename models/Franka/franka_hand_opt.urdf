@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="franka_hand">
+  <link
+    name="x_link">
+  </link>
+  <link
+    name="y_link">
+  </link>
+  <link
+    name="z_link">
+  </link>
+  <link
+    name="ax_link">
+  </link>
+  <link
+    name="ay_link">
+  </link>
+  <link
+    name="az_link">
+  </link>
+
+  <joint
+    name="x"
+    type="prismatic">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="x_link" />
+    <child
+      link="y_link" />
+    <axis
+      xyz="1 0 0" />
+      <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>
+
+  <joint
+    name="y"
+    type="prismatic">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="y_link" />
+    <child
+      link="z_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>
+
+  <joint
+    name="z"
+    type="prismatic">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="z_link" />
+    <child
+      link="ax_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>
+
+  <joint
+    name="ax"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="ax_link" />
+    <child
+      link="ay_link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>
+
+  <joint
+    name="ay"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="ay_link" />
+    <child
+      link="az_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>  
+
+  <joint
+    name="az"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="az_link" />
+    <child
+      link="base_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-100"
+      upper="100"
+      effort="1000"
+      velocity="1000" />
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="collision/hand.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="collision/hand.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+    
+
+  <link name="panda_leftfinger">
+    <visual>
+      <geometry>
+        <mesh filename="collision/finger.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="collision/finger.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+  <link name="panda_rightfinger">
+    <visual>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="collision/finger.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="collision/finger.stl"/>
+      </geometry>
+      <material name="panda_white"/>
+    </collision>
+  </link>
+  <joint name="panda_finger_joint1" type="prismatic">
+    <parent link="base_link"/>
+    <child link="panda_leftfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="20" lower="0.0" upper="0.05" velocity="0.2"/>
+  </joint>
+  <joint name="panda_finger_joint2" type="prismatic">
+    <parent link="base_link"/>
+    <child link="panda_rightfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="20" lower="0.0" upper="0.05" velocity="0.2"/>
+    <mimic joint="panda_finger_joint1"/>
+  </joint>
+  <material name="panda_white">
+    <color rgba="1. 1. 1. 1."/>
+  </material>
+
+  <klampt>
+    <noselfcollision pairs="base_link panda_leftfinger" />
+    <noselfcollision pairs="base_link panda_rightfinger" />
+    <noselfcollision pairs="panda_leftfinger panda_rightfinger" />
+     <sensors>
+    <CameraSensor name="eye" link="x_link"
+        Tsensor="0 -0.866 0.5 -1.0 0 0.0 0 -0.5 -0.866 0.4 0 1.55"
+        xres="1280" yres="720" xfov="1.605702911834783" yfov="1.2042771838760875" zmin="0.01"
+        zmax ="1.5" zresolution="0.01" zvarianceLinear="0.00001"/>
+    </sensors>
+  </klampt>
+
+  
+</robot>

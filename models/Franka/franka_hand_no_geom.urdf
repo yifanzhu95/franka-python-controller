@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="franka_hand">
+  <link name="world"/>
+  <joint name="fixed" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+  <link name="base_link">
+  </link>
+  <link name="panda_leftfinger">
+  </link>
+  <link name="panda_rightfinger">
+
+  </link>
+  <joint name="panda_finger_joint1" type="prismatic">
+    <parent link="base_link"/>
+    <child link="panda_leftfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="20" lower="0.0" upper="0.05" velocity="0.2"/>
+  </joint>
+  <joint name="panda_finger_joint2" type="prismatic">
+    <parent link="base_link"/>
+    <child link="panda_rightfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="20" lower="0.0" upper="0.05" velocity="0.2"/>
+    <mimic joint="panda_finger_joint1"/>
+  </joint>
+  <material name="panda_white">
+    <color rgba="1. 1. 1. 1."/>
+  </material>
+
+  <klampt>
+    <noselfcollision pairs="base_link panda_leftfinger" />
+    <noselfcollision pairs="base_link panda_rightfinger" />
+    <noselfcollision pairs="panda_leftfinger panda_rightfinger" />
+  </klampt>
+</robot>
