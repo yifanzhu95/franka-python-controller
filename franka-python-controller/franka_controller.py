@@ -13,7 +13,7 @@ import numpy as np
 
 from .abstract_controller import track_methods, include_method
 from .kinematic_controller import ControlMode, KinematicFrankaController
-
+from .motionUtils import GlobalCollisionHelper,TimedLooper
 import franka_motion
 
 @track_methods
@@ -42,6 +42,7 @@ class FrankaController(KinematicFrankaController):
 
         # Computing gravity vector for panda
         world_gravity = params.get('gravity', [0, 0, -9.81])
+        self.dt = params.get('dt', 1./100.)
         host = params['address']
         gravity  = so3.apply(so3.inv(self.base_transform[0]), world_gravity)
         impedance = params.get('impedance', [3000, 3000, 3000, 2500, 2500, 2000, 2000])
@@ -78,6 +79,7 @@ class FrankaController(KinematicFrankaController):
         self.wrench_calibrate_state = self.wrench_calibrate_samples
         # Pstop time
         self.pstop_duration = 0.5 # in seconds
+        self.stop_flag = False
 
     @include_method
     def status(self) -> str:
@@ -105,9 +107,27 @@ class FrankaController(KinematicFrankaController):
             time.sleep(1)
         return False
 
+    def start(self):
+        """Start the robot"""
+        def loop_func():
+            looper = TimedLooper(self.dt, name="motion::loop")#, warning_frequency=1)
+            while looper:
+                if self.stop_flag:
+                    print("motion::loop: Exiting")
+                    break
+                self._loop()
+        loop_thread = Thread(group=None, target=loop_func, name="motion: loop")
+        loop_thread.start()
+        time.sleep(0.5)
+
+    def _loop(self):
+        self.beginStep()
+        self.endStep()
+
     def close(self) -> bool:
         del self.driver # for good measure
         self.started = False
+        self.stop_flag = True
         return True
 
     def beginStep(self) -> None:
@@ -183,6 +203,15 @@ class FrankaController(KinematicFrankaController):
             self.update_IK_failure(not success)
             if success:
                 target_drivers = cfg
+        elif control_mode == ControlMode.VELOCITY_EE:
+            #Option 1, current T + delta T
+            tool_center = params.get('tool_center', se3.identity())
+            target_t = list(np.array(target[0:3])*self.dt + self.get_EE_transform(tool_center)[1])
+            target_R = so3.mul(self.get_EE_transform(tool_center)[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
+            success, cfg = self.drive_EE((target_R, target_t), params)
+
+            #Option 2, current target T + delta T 
+            #TBD
         else:
             self.update_IK_failure(False)
 
@@ -240,3 +269,19 @@ class FrankaController(KinematicFrankaController):
             ret['ddq'] = self.measured_accel
             ret['EE_wrench'] = self.measured_EE_wrench
         return ret
+
+    def set_EE_velocity(self, velocity: List[float], params):
+        """
+        Parameters:
+        --------------------
+            velocity:       [v w]    linear and angular velocity, list of 6 elements 
+            params:         dict    Other controller parameters, ex. tool center
+        """
+        if self._EE_link is None:
+            raise NotImplementedError(f"{self.get_name()}: set_EE_velocity called on component with no EE link")
+        if self.paused:
+            return
+        with self.control_lock:
+            self.target = velocity
+            self.controller_params = params
+            self.control_mode = ControlMode.VELOCITY_EE
