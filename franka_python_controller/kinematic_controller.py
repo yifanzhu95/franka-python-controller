@@ -14,11 +14,11 @@ except ImportError:
     from klampt.math import so3, se3, vectorops as vo
 from klampt.model import ik
 import numpy as np
-import cvxpy as cp
+#import cvxpy as cp
 
 
 from .abstract_controller import track_methods, include_method
-from .franka_kinematic_controller import KlamptModelController, ControlMode
+from .motion_kinematic_controller import KlamptModelController, ControlMode
 
 import franka_motion
 

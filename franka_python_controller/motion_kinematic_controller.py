@@ -221,15 +221,18 @@ class KlamptModelController(AbstractController):
 
     @tag_method(requires_EE=True)
     def get_EE_jacobian(self, toolcenter=(0, 0, 0)):
-        # # NOTE: THIS IS SO JANK, so much private variable usage!
-        # # Also subrobot's jacobian is broken anyway and I don't want it anyway
-        # if self._EE_link is None:
-        #     raise NotImplementedError(f"{self.get_name()}: get_EE_jacobian called on component with no EE link")
-        # dof_slice = np.array(self._robot_model._links)[self.driven_dofs]
+        # NOTE: THIS IS SO JANK, so much private variable usage!
+        # Also subrobot's jacobian is broken anyway and I don't want it anyway
+        if self._EE_link is None:
+            raise NotImplementedError(f"{self.get_name()}: get_EE_jacobian called on component with no EE link")
+        #dof_slice = np.array(self._robot_model._links)[self.driven_dofs] #this is for subrobot
+        dof_slice = np.array(list(range(self._robot_model.numLinks())))[self.driven_dofs]
         # return np.vstack((self._EE_link._link.getOrientationJacobian()[:, dof_slice],
         #                   self._EE_link._link.getPositionJacobian(toolcenter)[:, dof_slice]))
-        Jac = np.array(self._EE_link.getJacobian((0,0,0)))
-        return Jac[:,[1,2,3,4,5,6]]
+        return np.vstack((self._EE_link.getOrientationJacobian()[:, dof_slice],
+                    self._EE_link.getPositionJacobian(toolcenter)[:, dof_slice]))
+        # Jac = np.array(self._EE_link.getJacobian((0,0,0)))
+        # return Jac[:,[1,2,3,4,5,6]]
         #return 
 
     @tag_method(requires_EE=True)

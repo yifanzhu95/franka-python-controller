@@ -9,6 +9,7 @@ import klampt
 from klampt.math import so3, se3, vectorops as vo
 from klampt.model import ik
 import numpy as np
+import copy
 
 
 from .abstract_controller import track_methods, include_method
@@ -80,6 +81,9 @@ class FrankaController(KinematicFrankaController):
         # Pstop time
         self.pstop_duration = 0.5 # in seconds
         self.stop_flag = False
+        
+        #EE vel drive
+        self._last_vel_command = [0.]*6
 
     @include_method
     def status(self) -> str:
@@ -204,13 +208,21 @@ class FrankaController(KinematicFrankaController):
             if success:
                 target_drivers = cfg
         elif control_mode == ControlMode.VELOCITY_EE:
-            #Option 1, current T + delta T
-            tool_center = params.get('tool_center', se3.identity())
-            target_t = list(np.array(target[0:3])*self.dt + self.get_EE_transform(tool_center)[1])
-            target_R = so3.mul(self.get_EE_transform(tool_center)[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
-            success, cfg = self.drive_EE((target_R, target_t), params)
-
+            #Option 1, current T + delta T. Okay doesn't work when vel is small. 
+            # tool_center = params.get('tool_center', se3.identity())
+            # target_t = list(np.array(target[0:3])*self.dt + self.get_EE_transform(tool_center)[1])
+            # target_R = so3.mul(self.get_EE_transform(tool_center)[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
+            # success, cfg = self.drive_EE((target_R, target_t), params)
+            #print(self.get_EE_transform(tool_center)[1], target_t)
             #Option 2, current target T + delta T 
+            tool_center = params.get('tool_center', se3.identity())
+            target_t = list(np.array(target[0:3])*self.dt + self._last_commanded_T[1])
+            target_R = so3.mul(self._last_commanded_T[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
+            success, cfg = self.drive_EE((target_R, target_t), params)
+            self._last_commanded_T = (target_R, target_t)
+            # print(target_t)
+            if success:
+                target_drivers = cfg
             #TBD
         else:
             self.update_IK_failure(False)
@@ -282,6 +294,15 @@ class FrankaController(KinematicFrankaController):
         if self.paused:
             return
         with self.control_lock:
+            #if switching to Velocity EE:
+            tool_center = params.get('tool_center', se3.identity())
+            if self.control_mode != ControlMode.VELOCITY_EE:
+                self._last_commanded_T = self.get_EE_transform(tool_center)
+                self._last_vel_command = copy.copy(velocity)
+            elif self._last_vel_command != velocity:
+                self._last_commanded_T = self.get_EE_transform(tool_center)
+                self._last_vel_command = copy.copy(velocity)
             self.target = velocity
             self.controller_params = params
             self.control_mode = ControlMode.VELOCITY_EE
+            
