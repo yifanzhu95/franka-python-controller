@@ -110,13 +110,13 @@ class FrankaController(KinematicFrankaController):
     def start(self):
         """Start the robot"""
         def loop_func():
-            looper = TimedLooper(self.dt, name="motion::loop")#, warning_frequency=1)
+            looper = TimedLooper(self.dt, name="frankaController::loop")#, warning_frequency=1)
             while looper:
                 if self.stop_flag:
-                    print("motion::loop: Exiting")
+                    print("frankaController::loop: Exiting")
                     break
                 self._loop()
-        loop_thread = Thread(group=None, target=loop_func, name="motion: loop")
+        loop_thread = Thread(group=None, target=loop_func, name="frankaController: loop")
         loop_thread.start()
         time.sleep(0.5)
 

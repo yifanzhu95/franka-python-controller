@@ -20,6 +20,7 @@ controller = FrankaController(name = 'Franka', robot_model = robot_model, EE_lin
 
 # start robot
 controller.initialize()
+controller.start() 
 
 # get current states
 current_config = controller.get_joint_config()
