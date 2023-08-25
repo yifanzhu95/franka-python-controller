@@ -129,11 +129,13 @@ class PegInHoleTask():
         # self.current_task = {"name":"rotate_against_edge", "args":{}}
         
         #TODO: @Andy these are yours
-        # self.current_task = {"name":"insert_object", "args":{}}
+        self.current_task = {"name":"insert_object", "args":{}}
+        # self.current_task = {"name":"insert_object_2D", "args":{}}
         # self.current_task = {"name":"explore_hole_andy", "args":{}}
         
         
         # self.current_task = {"name":"insert", "args":{}}
+        # self.current_task = {"name":"insert2D", "args":{}} # ONGOING
         # self.current_task = {"name":"direct_control", "args":{"safe":True}}
 
 
@@ -506,6 +508,8 @@ class PegInHoleTask():
             vels = self.rotate_against_edge()
         if task_type == "insert_object":
             vels = self.insert_object()
+        if task_type == "insert_object_2D":
+            vels = self.insert_object_2D()
         if task_type =="explore_hole_andy":
             vels = self.explore_hole_andy()
 
@@ -750,6 +754,161 @@ class PegInHoleTask():
             
             else:
                 self.current_contact_target = (lateral_strength, lateral_strength, -downward_strength)
+                if abs(self.delta_from_floating[1]) > lateral_strength: # Regulation finished, switch to rotate
+                    self.task_vars.update({"state":"rotate"})
+                    self.past_contact_target = copy.copy(self.current_contact_target)
+                    
+                else:
+                    vels = [0, 0, 0, 0, 0, 0] # Do nothing, let the regulation work
+
+        # Sub-task: Go up
+        if self.task_vars["state"] == "rotate":
+            self.current_contact_target = [np.clip(self.past_contact_target[0], -0.4, 0.4),np.clip(self.past_contact_target[1], -0.4, 0.4), -1.1] #self.past_contact_target[2]]
+            vels = [0, 0, 0, 0, 0, 1] # Do nothing, let the regulation work
+            #if abs(self.delta_from_floating[5]) > 0.02:# Regulation finished, switch to slide1
+            if self.delta_from_floating[5] > 0.05:# Regulation finished, switch to slide1 USED 0.01 for the triangle
+                self.task_vars.update({"state":"insert"})
+
+
+        if self.task_vars["state"] == "insert":
+            rots = self.getObjectAngle()
+            if rots[0] is not None:
+                print('Rotations about axes: ', rots)
+                try:
+                    #Always use the hand rotations
+                    if abs(rots[1])> abs(rots[0]):
+                        if rots[1]<-0.0:
+                            self.inHandType.publish("right_delta")
+                        elif rots[1]>0.0:
+                            self.inHandType.publish("left_delta")
+                    else:
+                        if rots[0]<-0.0:
+                            self.inHandType.publish("up_delta")
+                        elif rots[1]>0.0:
+                            self.inHandType.publish("down_delta")
+                except:
+                    pass
+                    # rospy.logwarn('ANDY YOU DID SOMEHTING BAD ')
+                    # IPython.embed()
+                    
+                #regulate_motion = "translation" #this worked fine for the pear
+                regulate_motion = "rotation"
+
+                if regulate_motion == "translation":
+                    tar = 1.0
+                    self.current_contact_target = [0, 0, -1.0] #use this for the normal stuff
+                    # self.current_contact_target = [self.current_contact_target[0], self.current_contact_target[1], -1.5]
+                    
+                    if rots[1]<-0.02:
+                        self.current_contact_target[0] = -tar
+                    elif rots[1]>0.02:
+                        self.current_contact_target[0] = tar
+                    if rots[0]<-0.02:
+                            self.current_contact_target[1] = -tar
+                    elif rots[0]>0.02:
+                            self.current_contact_target[1] = tar
+                elif regulate_motion == "rotation":
+                    tar = 1.0
+                    self.current_contact_target = [0, 0, -0.8] #use this for the normal stuff
+                    if rots[1]<-0.0:
+                        vels[3] = -1
+                        # self.current_contact_target[0] = -tar
+                    elif rots[1]>0.0:
+                        vels[3] = 1
+                        # self.current_contact_target[0] = tar
+                    if rots[0]<-0.0:
+                        vels[4] = 1
+                        # self.current_contact_target[1] = -tar
+                    elif rots[0]>0.0:
+                        vels[4] = -1
+                        # self.current_contact_target[1] = tar
+            else:
+                # self.inHandType.publish("spiral")
+                self.current_contact_target = [0, 0, -1.]
+            
+        return vels
+
+    def insert_object_2D(self):
+        """
+        Task:
+        - (1) Go down until contact
+        - (2) Go right until side contact
+        - (3) Go left until side contact
+        - (4) Rotate until you find get a torque that is too high
+        - (5) Align and insert
+        """
+        
+        vels = [0, 0, 0, 0, 0, 0]
+        insertion_done = False
+        # (t, R)  = self.listener.lookupTransform('wam/wrist_palm_stump_link', 'wam/base_link', rospy.Time(0))
+        (t, R) = self.get_pos()
+        lateral_strength = 1
+        downward_strength = 2
+
+
+        # Initializing the task. Starting with 'down' task
+        if "state" not in self.task_vars:
+            self.task_vars.update({"state":"down"})
+            self.task_vars. update({"starting_position": t})
+            self.maintain_override = False
+            
+        print('********************************')
+        print('Task: ', 'insert_object')
+        print("Sub-task:", self.task_vars["state"])
+        
+        # Sub-task: Go down, and get a contact | Do nothing until self.last_contact is ~ 0
+        if self.task_vars["state"] == "down":
+            self.current_contact_target = self.standard_gravity_target
+            if abs(self.delta_from_floating[2]) > abs(self.standard_gravity_target[2]): #downward_strength: # Regulation finished, switch to slide1
+                self.task_vars.update({"state":"slide1"})
+            else:
+                vels = [0, 0, 0, 0, 0, 0] # Do nothing, let the regulation work
+
+
+        # Sub-task: Go left, keep down, until catching the edge of the hole.
+        if self.task_vars["state"] == "slide1":
+            # IPython.embed()
+            if 'contact_target_for_insertion' in self.task_vars.keys():
+                self.current_contact_target = self.task_vars['contact_target_for_insertion']
+                
+                unit_vector_1 =np.asarray(self.delta_from_floating[:2]) / np.linalg.norm(np.asarray(self.delta_from_floating[:2]))
+                unit_vector_2 = np.asarray(self.current_contact_target[:2]) / np.linalg.norm(np.asarray(self.current_contact_target[:2]))
+                dot_product = np.dot(unit_vector_1, unit_vector_2)
+                angle = np.arccos(dot_product)
+                print('ANGLE1: ', angle)
+                print('NORM1: ', np.linalg.norm(np.asarray(self.delta_from_floating[:2])))
+                if abs(angle)<0.3 and np.linalg.norm(np.asarray(self.delta_from_floating[:2]))> lateral_strength:
+                    self.task_vars.update({"state":"slide2"})
+                
+            else:
+                # self.inHandType.publish("left")
+                self.current_contact_target = (lateral_strength, None, -downward_strength)
+                if abs(self.delta_from_floating[0]) > lateral_strength: # Regulation finished, switch to slide1
+                    self.task_vars.update({"state":"slide2"})
+                else:
+                    vels = [0, 0, 0, 0, 0, 0] # Do nothing, let the regulation work
+                
+        # Sub-task: Go up
+        if self.task_vars["state"] == "slide2":
+            
+            if 'contact_target_for_insertion' in self.task_vars.keys():
+                # If we enter the insertion process from the exploration task: we keep the last exploration direction to make sure we don' t bounce from the hole but keep pushing into it.
+                self.current_contact_target = [-self.task_vars['contact_target_for_insertion'][1]+self.task_vars['contact_target_for_insertion'][0], self.task_vars['contact_target_for_insertion'][0]+self.task_vars['contact_target_for_insertion'][1], self.task_vars['contact_target_for_insertion'][2]]
+                
+                
+                unit_vector_1 =np.asarray(self.delta_from_floating[:2]) / np.linalg.norm(np.asarray(self.delta_from_floating[:2]))
+                unit_vector_2 = np.asarray(self.current_contact_target[:2]) / np.linalg.norm(np.asarray(self.current_contact_target[:2]))
+                dot_product = np.dot(unit_vector_1, unit_vector_2)
+                angle = np.arccos(dot_product)
+                print('ANGLE2: ', angle)
+                print('NORM2: ', np.linalg.norm(np.asarray(self.delta_from_floating[:2])))
+                
+                if abs(angle)<0.5 and np.linalg.norm(np.asarray(self.delta_from_floating[:2]))> lateral_strength/1.5:
+                    self.task_vars.update({"state":"rotate"})
+                    self.past_contact_target = copy.copy(self.current_contact_target)
+            
+            else:
+                self.current_contact_target = (lateral_strength, 0, -downward_strength) # No y direction in this one.
                 if abs(self.delta_from_floating[1]) > lateral_strength: # Regulation finished, switch to rotate
                     self.task_vars.update({"state":"rotate"})
                     self.past_contact_target = copy.copy(self.current_contact_target)
