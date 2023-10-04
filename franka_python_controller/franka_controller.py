@@ -82,6 +82,8 @@ class FrankaController(KinematicFrankaController):
         self.pstop_duration = 0.5 # in seconds
         self.stop_flag = False
         
+        self.initialized = False
+        self.startedFlag = False
         #EE vel drive
         self._last_vel_command = [0.]*6
 
@@ -102,27 +104,36 @@ class FrankaController(KinematicFrankaController):
         Franka driver is implemented as a python extension module in C++
         and uses libfranka to control the robot.
         """
-        self.driver.start()
-        for i in range(10):
-            if self.driver.state_valid:
-                self.started = True
-                self.beginStep()
-                return True
-            time.sleep(1)
+        if self.initialized:
+            print('Already initialized')
+        else:
+            self.driver.start()
+
+            for i in range(10):
+                if self.driver.state_valid:
+                    self.started = True
+                    self.initialized = True
+                    self.beginStep()
+                    return True
+                time.sleep(1)
         return False
 
     def start(self):
         """Start the robot"""
-        def loop_func():
-            looper = TimedLooper(self.dt, name="frankaController::loop")#, warning_frequency=1)
-            while looper:
-                if self.stop_flag:
-                    print("frankaController::loop: Exiting")
-                    break
-                self._loop()
-        loop_thread = Thread(group=None, target=loop_func, name="frankaController: loop")
-        loop_thread.start()
-        time.sleep(0.5)
+        if self.startedFlag:
+            print('Already started')
+        else:
+            self.startedFlag = True
+            def loop_func():
+                looper = TimedLooper(self.dt, name="frankaController::loop")#, warning_frequency=1)
+                while looper:
+                    if self.stop_flag:
+                        print("frankaController::loop: Exiting")
+                        break
+                    self._loop()
+            loop_thread = Thread(group=None, target=loop_func, name="frankaController: loop")
+            loop_thread.start()
+            time.sleep(0.5)
 
     def _loop(self):
         self.beginStep()
@@ -220,7 +231,7 @@ class FrankaController(KinematicFrankaController):
             target_R = so3.mul(self._last_commanded_T[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
             success, cfg = self.drive_EE((target_R, target_t), params)
             self._last_commanded_T = (target_R, target_t)
-            # print(target_t)
+            print(target, target_t)
             if success:
                 target_drivers = cfg
             #TBD
@@ -300,7 +311,11 @@ class FrankaController(KinematicFrankaController):
                 self._last_commanded_T = self.get_EE_transform(tool_center)
                 self._last_vel_command = copy.copy(velocity)
             elif self._last_vel_command != velocity:
-                self._last_commanded_T = self.get_EE_transform(tool_center)
+                current_T = self.get_EE_transform(tool_center)
+                for i in range(3):
+                    if self._last_vel_command[i] != velocity[i]:
+                        self._last_commanded_T[1][i] = current_T[1][i]
+                #self._last_commanded_T = self.get_EE_transform(tool_center)
                 self._last_vel_command = copy.copy(velocity)
             self.target = velocity
             self.controller_params = params
