@@ -69,6 +69,9 @@ class FrankaController(KinematicFrankaController):
         self.kd_hard = params.get('kd_hard', None)
         self.measured_accel = [0.0]*7
 
+        self.vel_drive_timeout = params.get('vel_drive_timeout', 0.1)
+        self.last_vel_drive_time = None
+
         # Collision checker state variables and configuration
         self.col_check_counter = params.get('col_check_offset', 0)
         self.col_check_modulus = params.get('col_check_modulus', 1)
@@ -226,14 +229,17 @@ class FrankaController(KinematicFrankaController):
             # success, cfg = self.drive_EE((target_R, target_t), params)
             #print(self.get_EE_transform(tool_center)[1], target_t)
             #Option 2, current target T + delta T 
-            tool_center = params.get('tool_center', se3.identity())
-            target_t = list(np.array(target[0:3])*self.dt + self._last_commanded_T[1])
-            target_R = so3.mul(self._last_commanded_T[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
-            success, cfg = self.drive_EE((target_R, target_t), params)
-            self._last_commanded_T = (target_R, target_t)
-            print(target, target_t)
-            if success:
-                target_drivers = cfg
+            if time.time() - self.last_vel_drive_time > self.vel_drive_timeout:
+                pass
+            else:
+                tool_center = params.get('tool_center', se3.identity())
+                target_t = list(np.array(target[0:3])*self.dt + self._last_commanded_T[1])
+                target_R = so3.mul(self._last_commanded_T[0], so3.from_rotation_vector(list(np.array(target[3:6])*self.dt)))
+                success, cfg = self.drive_EE((target_R, target_t), params)
+                self._last_commanded_T = (target_R, target_t)
+                #print(target, target_t)
+                if success:
+                    target_drivers = cfg
             #TBD
         else:
             self.update_IK_failure(False)
@@ -320,4 +326,5 @@ class FrankaController(KinematicFrankaController):
             self.target = velocity
             self.controller_params = params
             self.control_mode = ControlMode.VELOCITY_EE
+            self.last_vel_drive_time = time.time()
             
