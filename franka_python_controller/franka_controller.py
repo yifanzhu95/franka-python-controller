@@ -317,11 +317,11 @@ class FrankaController(KinematicFrankaController):
                 self._last_commanded_T = self.get_EE_transform(tool_center)
                 self._last_vel_command = copy.copy(velocity)
             elif self._last_vel_command != velocity:
-                current_T = self.get_EE_transform(tool_center)
-                for i in range(3):
-                    if self._last_vel_command[i] != velocity[i]:
-                        self._last_commanded_T[1][i] = current_T[1][i]
-                #self._last_commanded_T = self.get_EE_transform(tool_center)
+                # current_T = self.get_EE_transform(tool_center)
+                # for i in range(3):
+                #     if self._last_vel_command[i] != velocity[i]:
+                #         self._last_commanded_T[1][i] = current_T[1][i]
+                # #self._last_commanded_T = self.get_EE_transform(tool_center)
                 self._last_vel_command = copy.copy(velocity)
             self.target = velocity
             self.controller_params = params
